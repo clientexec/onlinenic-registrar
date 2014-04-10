@@ -80,7 +80,7 @@ class PluginOnlinenic extends RegistrarPlugin
     function checkDomain($params)
     {
         $host = 'onlinenic.com';
-        if ($params['Use testing server']) $host = '218.5.81.149';
+        //if ($params['Use testing server']) $host = '218.5.81.149';
 
         $onlinenic = new OnlineNIC($host,
                                    $params['Username'],
@@ -114,7 +114,7 @@ class PluginOnlinenic extends RegistrarPlugin
         } else {
             $status = 5;
         }
-        $domains[] = array("tld"=>$params['sld'],"domain"=>$params['tld'],"status"=>$status);
+        $domains[] = array("tld"=>$params['tld'],"domain"=>$params['sld'],"status"=>$status);
         return array("result"=>$domains);
     }
 
