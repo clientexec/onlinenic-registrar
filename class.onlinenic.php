@@ -96,28 +96,7 @@ class OnlineNIC
      */
     function lookup_domain($sld, $tld)
     {
-        switch($tld) {
-            case 'com':
-            case 'net':
-            case 'org':
-                $domainType = 0;
-                break;
-            case 'biz':
-                $domainType = 800;
-                break;
-            case 'info':
-                $domainType = 805;
-                break;
-            case 'us':
-                $domainType = 806;
-                break;
-            case 'in':
-                $domainType = 808;
-                break;
-            case 'cn':
-                $domainType = 220;
-                break;
-        }
+		$domainType = $this->getDomainType($tld);
 
         $clTRID = $this->getClTrid();
 
@@ -175,30 +154,8 @@ class OnlineNIC
                 $NexusCategory .= "/".$params['RegistrantCountry'];
                 break;
         }
-
-        switch($params['tld']) {
-            case 'com':
-            case 'net':
-            case 'org':
-                $domainType = 0;
-                break;
-            case 'biz':
-                $domainType = 800;
-                break;
-            case 'info':
-                $domainType = 805;
-                break;
-            case 'us':
-                $domainType = 806;
-                break;
-            case 'in':
-                $domainType = 808;
-                break;
-            case 'cn':
-                $domainType = 220;
-                break;
-        }
-
+		$domainType = $this->getDomainType($params['tld']);
+      
         $request = "
             <create>
                 <contact:create xmlns:contact=\"urn:iana:xml:ns:contact-1.0\" xsi:schemaLocation=\"urn:iana:xml:ns:con tact-1.0 contact-1.0.xsd\">
@@ -254,29 +211,8 @@ class OnlineNIC
      */
     function register_domain($params)
     {
-        switch($params['tld']) {
-            case 'com':
-            case 'net':
-            case 'org':
-                $domainType = 0;
-                break;
-            case 'biz':
-                $domainType = 800;
-                break;
-            case 'info':
-                $domainType = 805;
-                break;
-            case 'us':
-                $domainType = 806;
-                break;
-            case 'in':
-                $domainType = 808;
-                break;
-            case 'cn':
-                $domainType = 220;
-                break;
-        }
-
+		$domainType = $this->getDomainType($params['tld']);
+       
         $clTRID = $this->getClTrid();
         $chk_sum = md5($this->user . md5($this->key) . $clTRID . "crtdomain" . $domainType . $params['domain'] . $params['NumYears'] . $params['NS1']['hostname'] . $params['NS2']['hostname'] . $params['ContactID'] . $params['ContactID'] . $params['ContactID'] . $params['ContactID'] . $params['DomainPassword']);
 
@@ -384,6 +320,35 @@ class OnlineNIC
         if ($this->fp)
             fclose($this->fp);
     }
+	
+	private function getDomainType($tld)
+	{
+		switch($tld) {
+            case 'com':
+            case 'net':
+            case 'org':
+                $domainType = 0;
+                break;
+            case 'biz':
+                $domainType = 800;
+                break;
+            case 'info':
+                $domainType = 805;
+                break;
+            case 'us':
+                $domainType = 806;
+                break;
+            case 'in':
+                $domainType = 808;
+                break;
+            case 'cn':
+                $domainType = 220;
+                break;
+		   case 'co':
+                $domainType = 908;
+                break;
+        }
+		
+		return $domainType;
+	}
 }
-
-?>
