@@ -129,7 +129,7 @@ class PluginOnlinenic extends RegistrarPlugin
         $userPackage = new UserPackage($params['userPackageId']);
         $orderid = $this->registerDomain($this->buildRegisterParams($userPackage,$params));
         $userPackage->setCustomField("Registrar Order Id",$userPackage->getCustomField("Registrar").'-'.$orderid);
-        return true;
+        return $userPackage->getCustomField('Domain Name') . ' has been registered.';
     }
 
     function registerDomain($params)
@@ -220,7 +220,7 @@ class PluginOnlinenic extends RegistrarPlugin
         // Check for logout errors
         $this->getError($logoutReturn, 'Logout');
 
-        return array($regId);
+        return $regId;
     }
 
     // @access private
