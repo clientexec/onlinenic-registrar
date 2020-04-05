@@ -121,7 +121,6 @@ class ApiClient {
 	                        $commonStr .= $params['domaintype'].$params['domain'].$params['period'].$params['dns'][0].$params['dns'][1].$params['registrant'].$params['admin'].$params['tech'].$params['billing'].$params['ced'].$params['password'];
 	                    } else {
 	                        $commonStr .= $params['domaintype'].$params['domain'].$params['period'].$params['dns'][0].$params['dns'][1].$params['registrant'].$params['admin'].$params['tech'].$params['billing'].$params['password'];
-                            CE_Lib::log(4, 'Check Sum: ' . $commonStr);
 	                    }
 	                    break;
 	                case 'RenewDomain':
@@ -191,11 +190,13 @@ class ApiClient {
 	                case 'QueryCustTransfer':
 	                    $commonStr .= $params['domaintype'] . $params['domain'] . $params['op'];
 	                    break;
-	                case 'RequestCustTransfer':
+
+                case 'RequestCustTransfer':
 	                    $commonStr .= $params['domaintype'] . $params['domain'] . $params['password'] . $params['curID'];
 	                    break;
 	                case 'CustTransferSetPwd':
-	                    $commonStr .= $params['domaintype'] . $params['domain'] . $params['password'];
+
+                    $commonStr .= $params['domaintype'] . $params['domain'] . $params['password'];
 	                    break;
 	                default:
 	                    $params = ksort($params);
@@ -244,7 +245,8 @@ class ApiClient {
 	public function request($cmd) {
 		if ( !$this->client ) {
 			$client = TcpClient::connect($this->config);
-			if ( false === $client ) return 1;
+
+		if ( false === $client ) return 1;
 			$this->writeLog("GREETING:\r\n" . $client->getLastMessage());
 			$this->client = &$client;
 		}
@@ -302,7 +304,7 @@ class ApiClient {
 		} else $resData = '';
 		if ( $code >= 1000 && $code < 2000 ) {
 			if ( !$resData ) return true;
-			if ( preg_match_all('/<data name=\"(.*)\">([\s\S]*)<\/data>/U', $resData, $match, PREG_SET_ORDER) ) {
+		if ( preg_match_all('/<data name=\"(.*)\">([\s\S]*)<\/data>/U', $resData, $match, PREG_SET_ORDER) ) {
 				$data = array();
 				foreach ( $match as $v ) {
 					if ( isset($data[html_entity_decode($v[1])]) ) {
@@ -338,7 +340,7 @@ class ApiClient {
 		if ($this->config['log_record']==false) {
 			return;
 		}
-        CE_Lib::log(4, $str);
+		CE_Lib::log(4, $str);
 	}
 
 	public function __destruct() {

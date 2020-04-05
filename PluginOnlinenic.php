@@ -7,6 +7,13 @@ require_once dirname(__FILE__).'/ApiClient.php';
 */
 class PluginOnlinenic extends RegistrarPlugin
 {
+    public $features = [
+        'nameSuggest' => false,
+        'importDomains' => false,
+        'importPrices' => false,
+    ];
+
+    private $domainTypes = [];
 
     function getVariables()
     {
@@ -44,7 +51,7 @@ class PluginOnlinenic extends RegistrarPlugin
             lang('Registered Actions') => array (
                                 'type'          => 'hidden',
                                 'description'   => lang('Current actions that are active for this plugin (when a domain is registered)'),
-                                'value'         => 'Cancel',
+                                'value'         => 'Renew (Renew Domain),Cancel',
                                 )
         );
 
@@ -58,7 +65,7 @@ class PluginOnlinenic extends RegistrarPlugin
         $api = new ApiClient($this->getConfig($params));
         $cmd = $api->buildCommand('client', 'Login');
         $rs  = $api->request($cmd);
-        if ( $rs ) {
+        if ($rs) {
             //something error happen
             $lastResult = $api->getLastResult();
             $error = $this->getError(__LINE__, $rs, $lastResult);
@@ -74,17 +81,16 @@ class PluginOnlinenic extends RegistrarPlugin
         $cmd = $api->buildCommand('domain', 'CheckDomain', $infoDomainParams);
         $rs = $api->request($cmd);
         $lastResult = $api->getLastResult();
-        if ( $rs ) {
+        if ($rs) {
             $error = $this->getError(__LINE__, $rs, $lastResult);
             $status = 5;
             $domains[] = array('tld' => $params['tld'], 'domain' => $params['sld'], 'status' => $status);
             return array("result"=>$domains);
         } else {
-
             $status = 1;
 
             // avail = 1 means the domain is available for registration.
-            if ( $lastResult['resData']['avail'] == 1 ) {
+            if ($lastResult['resData']['avail'] == 1) {
                 $status = 0;
             }
         }
@@ -106,9 +112,9 @@ class PluginOnlinenic extends RegistrarPlugin
     function doRegister($params)
     {
         $userPackage = new UserPackage($params['userPackageId']);
-        $this->registerDomain($this->buildRegisterParams($userPackage,$params));
+        $this->registerDomain($this->buildRegisterParams($userPackage, $params));
         // no order id given in API, so just set it to the package id.
-        $userPackage->setCustomField("Registrar Order Id",$userPackage->getCustomField("Registrar") . '-' . $params['userPackageId']);
+        $userPackage->setCustomField("Registrar Order Id", $userPackage->getCustomField("Registrar") . '-' . $params['userPackageId']);
         return $userPackage->getCustomField('Domain Name') . ' has been registered.';
     }
 
@@ -117,7 +123,7 @@ class PluginOnlinenic extends RegistrarPlugin
         $api = new ApiClient($this->getConfig($params));
         $cmd = $api->buildCommand('client', 'Login');
         $rs  = $api->request($cmd);
-        if ( $rs ) {
+        if ($rs) {
             //something error happen
             $lastResult = $api->getLastResult();
             $error = $this->getError(__LINE__, $rs, $lastResult);
@@ -127,14 +133,13 @@ class PluginOnlinenic extends RegistrarPlugin
         $domain = strtolower($params['sld'] . '.' . $params['tld']);
         $domainType = $this->getDomainType($params['tld']);
 
-
-        if ( $params['RegistrantOrganizationName'] == '' ) {
+        if ($params['RegistrantOrganizationName'] == '') {
             $params['RegistrantOrganizationName'] = 'N/A';
         }
 
         $contactNum = 4;
         $contactIdArr = array();
-        for($i=0; $i<$contactNum; $i++) {
+        for ($i=0; $i<$contactNum; $i++) {
             $createContactParams = array(
                 'domaintype' => $domainType,
                 'name'       => $params['RegistrantFirstName'] . ' ' . $params['RegistrantLastName'],
@@ -195,8 +200,6 @@ class PluginOnlinenic extends RegistrarPlugin
         if ($rs) {
             $error = $this->getError(__LINE__, $rs, $lastResult);
             throw new CE_Exception($error);
-        } else {
-
         }
 
         $cmd = $api->buildCommand('client', 'Logout');
@@ -208,7 +211,7 @@ class PluginOnlinenic extends RegistrarPlugin
         $api = new ApiClient($this->getConfig($params));
         $cmd = $api->buildCommand('client', 'Login');
         $rs  = $api->request($cmd);
-        if ( $rs ) {
+        if ($rs) {
             //something error happen
             $lastResult = $api->getLastResult();
             $error = $this->getError(__LINE__, $rs, $lastResult);
@@ -224,22 +227,16 @@ class PluginOnlinenic extends RegistrarPlugin
         $cmd = $api->buildCommand('domain', 'InfoDomain', $infoDomainParams);
         $rs = $api->request($cmd);
         $lastResult = $api->getLastResult();
-        if ( $rs ) {
+        if ($rs) {
             $error = $this->getError(__LINE__, $rs, $lastResult);
             throw new Exception($error);
         } else {
-
-            // their API is being weird with this:
-            CE_Lib::log(4, 'test: ');
-            CE_Lib::log(4, $api->getLastResponse());
-
-
             $data['id'] = $params['userPackageId'];
             $data['domain'] = $params['sld'] . '.' . $params['tld'];
             $data['expiration'] = $lastResult['resData']['exDate'];
             $data['registrationstatus'] = $this->user->lang('Registered On: ') . $lastResult['resData']['crDate'];
             $data['purchasestatus'] = 'N/A';
-
+            $data['is_registered'] = true;
         }
 
         //logout api
@@ -273,22 +270,27 @@ class PluginOnlinenic extends RegistrarPlugin
 
     private function getConfig($params)
     {
+        if (count($this->domainTypes) == 0) {
+            $this->buildDomainTypes();
+        }
+
         $server = 'www.onlinenic.com';
-        if ( $params['Use testing server'] == 1 ) {
+        if ($params['Use testing server'] == 1) {
             $server = 'ote.onlinenic.com';
         }
         return array (
-        	'server' => $server,
-        	'port' => '30009',
-        	'user' => $params['Username'],
-        	'pass' => $params['Private Key'],
-        	'timeout' => 15,
-        	'log_record' => true
+            'server' => $server,
+            'port' => '30009',
+            'user' => $params['Username'],
+            'pass' => $params['Private Key'],
+            'timeout' => 15,
+            'log_record' => true
         );
     }
 
-    private function getError($line, $rs, $lastResult) {
-    	switch($rs) {
+    private function getError($line, $rs, $lastResult)
+    {
+        switch ($rs) {
             case 1:
                 $error = "Can't connect to server";
                 break;
@@ -299,97 +301,213 @@ class PluginOnlinenic extends RegistrarPlugin
                 $error = 'unknow error';
                 break;
         }
-    	CE_Lib::log(4, $error);
+        CE_Lib::log(4, $error);
 
         return $error;
     }
 
+    private function buildDomainTypes()
+    {
+        $file = file_get_contents(dirname(__FILE__) . '/domain-types.json');
+        $this->domainTypes = json_decode($file);
+    }
+
     private function getDomainType($tld)
     {
-        switch($tld) {
-            case 'com':
-            case 'net':
-                $domainType = 0;
-                break;
-            case 'org':
-                $domainType = 807;
-                break;
-            case 'biz':
-                $domainType = 800;
-                break;
-            case 'info':
-                $domainType = 805;
-                break;
-            case 'us':
-                $domainType = 806;
-                break;
-            case 'in':
-                $domainType = 808;
-                break;
-           case 'co':
-                $domainType = 908;
-                break;
+        foreach ($this->domainTypes as $domainType) {
+            if ($domainType->tld == $tld) {
+                return $domainType->type;
+            }
+        }
+    }
+
+    function getContactInformation($params)
+    {
+        $api = new ApiClient($this->getConfig($params));
+        $cmd = $api->buildCommand('client', 'Login');
+        $rs  = $api->request($cmd);
+        if ($rs) {
+            //something error happen
+            $lastResult = $api->getLastResult();
+            $error = $this->getError(__LINE__, $rs, $lastResult);
+            throw new CE_Exception($error, EXCEPTION_CODE_CONNECTION_ISSUE);
         }
 
-        return $domainType;
+        $data = array();
+        $infoDomainParams = array(
+            'domaintype' => $this->getDomainType($params['tld']),
+            'domain'     => $params['sld'] . '.' . $params['tld']
+        );
+
+        $cmd = $api->buildCommand('domain', 'InfoDomain', $infoDomainParams);
+        $rs = $api->request($cmd);
+        $lastResult = $api->getLastResult();
+        if ($rs) {
+            $error = $this->getError(__LINE__, $rs, $lastResult);
+            throw new Exception($error);
+        } else {
+            $info = array();
+
+            $name = explode(' ', $lastResult['resData']['r_name']);
+            $firstName = $name[0];
+            unset($name[0]);
+            $lastName = implode(' ', $name);
+
+            foreach (array('Registrant', 'AuxBilling', 'Admin', 'Tech') as $type) {
+                $info[$type]['OrganizationName']  = array($this->user->lang('Organization'), $lastResult['resData']['r_org']);
+                //$info[$type]['JobTitle']  = array($this->user->lang('Job Title'), $data[$type.'JobTitle'][0]['#']);
+                $info[$type]['FirstName'] = array($this->user->lang('First Name'), $firstName);
+                $info[$type]['LastName']  = array($this->user->lang('Last Name'), $lastName);
+                $info[$type]['Address1']  = array($this->user->lang('Address').' 1', $lastResult['resData']['r_address']);
+                $info[$type]['Address2']  = array($this->user->lang('Address').' 2', '');
+                $info[$type]['City']      = array($this->user->lang('City'), $lastResult['resData']['r_city']);
+                //$info[$type]['StateProvChoice']  = array($this->user->lang('State or Province'), $data[$type.'StateProvinceChoice'][0]['#']);
+                $info[$type]['StateProvince']  = array($this->user->lang('Province').'/'.$this->user->lang('State'), $lastResult['resData']['r_province']);
+                $info[$type]['Country']   = array($this->user->lang('Country'), $lastResult['resData']['r_country']);
+                $info[$type]['PostalCode']  = array($this->user->lang('Postal Code'), $lastResult['resData']['r_postalcode']);
+                $info[$type]['EmailAddress']     = array($this->user->lang('E-mail'), $lastResult['resData']['r_email']);
+                $info[$type]['Phone']  = array($this->user->lang('Phone'), $lastResult['resData']['r_telephone']);
+                //$info[$type]['PhoneExt']  = array($this->user->lang('Phone Ext'), $data[$type.'PhoneExt'][0]['#']);
+                $info[$type]['Fax']       = array($this->user->lang('Fax'), $lastResult['resData']['r_fax']);
+            }
+        }
+
+        //logout api
+        $cmd = $api->buildCommand('client', 'Logout');
+        $rs  = $api->request($cmd);
+
+        return $info;
     }
 
-    function getContactInformation ($params)
+    function doRenew($params)
     {
-        throw new CE_Exception('Getting Contact Information is not supported in this plugin.', EXCEPTION_CODE_NO_EMAIL);
+
+        $userPackage = new UserPackage($params['userPackageId']);
+        $this->renewDomain($this->buildRegisterParams($userPackage, $params));
+
+        return $userPackage->getCustomField('Domain Name') . ' has been renewed.';
     }
 
-    function setContactInformation ($params)
+    function setContactInformation($params)
     {
         throw new CE_Exception('Method setContactInformation() has not been implemented yet.');
     }
 
-    function getNameServers ($params)
+    function getNameServers($params)
     {
-        throw new CE_Exception('Getting Name Server Records is not supported in this plugin.', EXCEPTION_CODE_NO_EMAIL);
+        $api = new ApiClient($this->getConfig($params));
+        $cmd = $api->buildCommand('client', 'Login');
+        $rs  = $api->request($cmd);
+        if ($rs) {
+            //something error happen
+            $lastResult = $api->getLastResult();
+            $error = $this->getError(__LINE__, $rs, $lastResult);
+            throw new CE_Exception($error, EXCEPTION_CODE_CONNECTION_ISSUE);
+        }
+
+        $data= array();
+        $info= array();
+        $infoDomainParams = array(
+            'domaintype' => $this->getDomainType($params['tld']),
+            'domain'     => $params['sld'] . '.' . $params['tld']
+        );
+
+        $cmd = $api->buildCommand('domain', 'InfoDomain', $infoDomainParams);
+        $rs = $api->request($cmd);
+        $lastResult = $api->getLastResult();
+        if ($rs) {
+            $error = $this->getError(__LINE__, $rs, $lastResult);
+            throw new Exception($error);
+        } else {
+            $data = $lastResult['resData']['dns'];
+        }
+        if (is_array($data)) {
+            $info = $data;
+            return $info;
+        }
+
+        //logout api
+        $cmd = $api->buildCommand('client', 'Logout');
+        $rs  = $api->request($cmd);
     }
 
-    function setNameServers ($params)
+    function setNameServers($params)
     {
         throw new CE_Exception('Method setNameServers() has not been implemented yet.');
     }
 
-    function checkNSStatus ($params)
+    function checkNSStatus($params)
     {
         throw new CE_Exception('Method checkNSStatus() has not been implemented yet.');
     }
 
-    function registerNS ($params)
+    function registerNS($params)
     {
         throw new CE_Exception('Method registerNS() has not been implemented yet.');
     }
 
-    function editNS ($params)
+    function editNS($params)
     {
         throw new CE_Exception('Method editNS() has not been implemented yet.', EXCEPTION_CODE_NO_EMAIL);
     }
 
-    function deleteNS ($params)
+    function deleteNS($params)
     {
         throw new CE_Exception('Method deleteNS() has not been implemented yet.');
     }
 
-    function setAutorenew ($params)
+    function setAutorenew($params)
     {
         throw new MethodNotImplemented('Method setAutorenew() has not been implemented yet.');
     }
 
-    function getRegistrarLock ($params)
+    function renewDomain($params)
+    {
+        $api = new ApiClient($this->getConfig($params));
+        $cmd = $api->buildCommand('client', 'Login');
+        $rs  = $api->request($cmd);
+        if ($rs) {
+            //something error happen
+            $lastResult = $api->getLastResult();
+            $error = getError(__LINE__, $rs, $lastResult);
+            throw new CE_Exception($error, EXCEPTION_CODE_CONNECTION_ISSUE);
+        }
+
+        $domain = strtolower($params['sld'] . '.' . $params['tld']);
+        $domainType = $this->getDomainType($params['tld']);
+
+        //RenewDomain
+        $renewDomainParams = array(
+            'domaintype' => $domainType,
+            'domain'     => $domain,
+            'period'     => 1,//1 year
+        );
+
+        $cmd        = $api->buildCommand('domain', 'RenewDomain', $renewDomainParams);
+        $rs         = $api->request($cmd);
+        $lastResult = $api->getLastResult();
+        if ($rs) {
+            $error = $this->getError(__LINE__, $rs, $lastResult);
+            throw new CE_Exception($error);
+        }
+
+        //logout api
+        $cmd = $api->buildCommand('client', 'Logout');
+        $rs  = $api->request($cmd);
+        return $data;
+    }
+
+    function getRegistrarLock($params)
     {
         throw new CE_Exception('Method getRegistrarLock() has not been implemented yet.', EXCEPTION_CODE_NO_EMAIL);
     }
 
-    function setRegistrarLock ($params)
+    function setRegistrarLock($params)
     {
         throw new CE_Exception('Method setRegistrarLock() has not been implemented yet.');
     }
 
-    function sendTransferKey ($params)
+    function sendTransferKey($params)
     {
         throw new CE_Exception('Method sendTransferKey() has not been implemented yet.');
     }
@@ -402,4 +520,12 @@ class PluginOnlinenic extends RegistrarPlugin
         throw new MethodNotImplemented('Method getTransferStatus has not been implemented yet.', EXCEPTION_CODE_NO_EMAIL);
     }
 
+    function getDNS($params)
+    {
+        throw new CE_Exception('Getting DNS Records is not supported in this plugin.', EXCEPTION_CODE_NO_EMAIL);
+    }
+    function setDNS($params)
+    {
+        throw new CE_Exception('Setting DNS Records is not supported in this plugin.');
+    }
 }
